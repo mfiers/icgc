@@ -1,0 +1,208 @@
+#!/usr/bin/env python
+
+import argparse
+import glob
+import gzip
+import logging
+import os
+import sys
+import time
+
+logging.basicConfig(format=": %(message)s")
+lg = logging.getLogger(__name__)
+lg.setLevel(logging.DEBUG)
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, Integer, String, Float, Table, MetaData
+
+DB = './icgc.db'
+BASE = declarative_base()
+ENGINE = create_engine('sqlite:///' + DB)
+BUNCH_COMMIT = 100000
+SESSION = sessionmaker(bind=ENGINE)()
+COMMIT_BUNCH = 100
+METADATA = MetaData()
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-f', '--force', help='actually run - note, this '
+                    'will delete the old table',
+                    action='store_true')
+
+args = parser.parse_args()
+
+#      d888888b d8888b. db        d8888b. d88888b d88888b
+#      `~~88~~' 88  `8D 88        88  `8D 88'     88'
+#         88    88oooY' 88        88   88 88ooooo 88ooo
+#         88    88~~~b. 88        88   88 88~~~~~ 88~~~
+#         88    88   8D 88booo.   88  .8D 88.     88
+#         YP    Y8888P' Y88888P   Y8888D' Y88888P YP
+
+
+def get_table_name(F):
+    "find start of table & return name"
+    for line in F:
+        if line[0] == '#': break
+    else:
+        return None
+    return line.split(':')[1].strip()
+
+def get_columns(F):
+    "Yield colums as long as we're in a table"
+    F.readline() # purge table header
+    F.readline() # purge table header
+    for line in F:
+        if not line.strip():
+            break
+        col = [x.strip() for x in line.strip().split('|')][1:-1]
+        col_type = {"String": String,
+                    "Integer" : Integer,
+                    "Float" : Float}[col[1]]
+        args = {}
+        if col[2] == 'Y':
+            args['primary_key'] = True
+
+        if col[3] == 'Y':
+            args['nullable'] = True
+        else:
+            args['nullable'] = False
+
+        if col[4] == 'Y':
+            args['index'] = True
+
+
+        sql_col = Column(col[0], col_type, **args)
+        yield(col, sql_col)
+
+def table_loader(F):
+    global METADATA
+    while True:
+        table = {}
+        sql_cols = []
+        name = get_table_name(F)
+        if name == None:
+            break #EOF
+        table['name'] = name
+        lg.info("found table {}".format(name))
+        table['columns'] = []
+        for col, sql_col in get_columns(F):
+            table['columns'].append(col)
+            sql_cols.append(sql_col)
+        sql_table = Table(name, METADATA, *sql_cols)
+        yield table, sql_table
+
+TABLES = {}
+SQLTABLES = {}
+with open("scripts/tables") as F:
+    for table, sql_table in table_loader(F):
+        TABLES[table['name']] = table
+        SQLTABLES[table['name']] = sql_table
+
+#       .o88b. db   db d88888b  .o88b. db   dD          d88888b
+#      d8P  Y8 88   88 88'     d8P  Y8 88 ,8P'          88'
+#      8P      88ooo88 88ooooo 8P      88,8P            88ooo
+#      8b      88~~~88 88~~~~~ 8b      88`8b     C8888D 88~~~
+#      Y8b  d8 88   88 88.     Y8b  d8 88 `88.          88
+#       `Y88P' YP   YP Y88888P  `Y88P' YP   YD          YP
+
+if not os.path.exists(DB):
+    lg.warning("creating database")
+    BASE.metadata.create_all(ENGINE)
+elif args.force:
+    lg.warning("removing & recreating database")
+    os.unlink(DB)
+    METADATA.create_all(ENGINE)
+else:
+    lg.warning("need to run with -f to enforce db overwrite")
+    sys.exit()
+
+#      db       .d88b.   .d8b.  d8888b.
+#      88      .8P  Y8. d8' `8b 88  `8D
+#      88      88    88 88ooo88 88   88
+#      88      88    88 88~~~88 88   88
+#      88booo. `8b  d8' 88   88 88  .8D
+#      Y88888P  `Y88P'  YP   YP Y8888D'
+
+
+def process_row_String(x):
+    return x.strip()
+
+def process_row_Integer(x):
+    try:
+        return int(x)
+    except:
+        return None
+
+def process_row_Float(x):
+    try:
+        return int(x)
+    except:
+        return None
+
+def process_row(header, coltype, line):
+    row = dict([(x, coltype[x](y))
+           for x,y in zip(header, line.split("\t"))
+           if x in coltype
+           ])
+    return row
+
+def bulkload(sql_table, table, filename):
+    global SESSION
+    cols = table['columns']
+    lg.debug("found {} columns ".format(len(cols)))
+    coltype = dict([(x[0], globals()['process_row_{}'.format(x[1])])
+                   for x in cols])
+
+    conn = ENGINE.connect()
+
+    rows = 0
+    if '.gz' in filename:
+        handle = gzip.open(filename)
+    else:
+        handle = open(filename)
+
+    start = time.time()
+    with gzip.open(filename) as F:
+        header = F.readline().decode('ascii', "ignore").split("\t")
+        bunch = []
+        startbunch = time.time()
+
+        for i, line in enumerate(F):
+            line = line.decode('ascii', "ignore")
+            row = process_row(header, coltype, line)
+            rows += 1
+            bunch.append(row)
+            if len(bunch) >= BUNCH_COMMIT:
+                conn.execute(sql_table.insert(), bunch)
+                lg.debug("inserted %d recs in %.2f s (%.4f ms/rec) (total: %d, %.2f s)",
+                    len(bunch),
+                    time.time() - startbunch,
+                    1000 * (time.time() - startbunch) / float(len(bunch)),
+                    rows, time.time() - start)
+
+                bunch = []
+                startbunch = time.time()
+
+    conn.execute(sql_table.insert(), bunch)
+    lg.info("inserted %d rows", rows)
+
+
+
+#find files
+for project in os.listdir('data/current'):
+    if project[0] == '.':
+        continue
+    lg.debug("working on {}".format(project))
+    base = os.path.join('data', 'current', project)
+
+    for tbl_name, file_name in [
+                ('sample', 'clinicalsample'),
+                ('participant', 'clinicalclean'),
+                ('expression', 'gene_expression')]:
+        pattern = os.path.join(base, file_name + '.*.tsv*')
+        filename = glob.glob(pattern)[0]
+        lg.debug("starting bulkload of %s", tbl_name)
+        lg.debug("  based on file %s", filename)
+        bulkload(SQLTABLES[tbl_name], TABLES[tbl_name], filename)

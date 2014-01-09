@@ -1,0 +1,94 @@
+# Table:sample
+|         column        |  type  | PK | null | idx |
+|=======================|========|====|======|=====|
+| icgc_sample_id        | String | Y  | Y    |     |
+| project_code          | String |    | Y    | Y   |
+| icgc_specimen_id      | String |    | Y    |     |
+| icgc_donor_id         | String |    | Y    | Y   |
+| submitted_sample_id   | String |    | Y    |     |
+| submitted_specimen_id | String |    | Y    |     |
+| analyzed_sample_type  | String |    | Y    | Y   |
+
+
+# Table:participant
+|                    column                    |   type  | PK | null | idx |
+|==============================================|=========|====|======|=====|
+| icgc_donor_id                                | String  | Y  |      |     |
+| project_code                                 | String  |    |      | Y   |
+| submitted_donor_id                           | String  |    | Y    | Y   |
+| donor_sex                                    | String  |    | Y    | Y   |
+| donor_vital_status                           | String  |    | Y    |     |
+| disease_status_last_followup                 | String  |    | Y    |     |
+| donor_relapse_type                           | String  |    | Y    |     |
+| donor_age_at_diagnosis                       | Integer |    | Y    |     |
+| donor_age_at_enrollment                      | Integer |    | Y    |     |
+| donor_age_at_last_followup                   | Integer |    | Y    |     |
+| donor_relapse_interval                       | String  |    | Y    |     |
+| donor_diagnosis_icd10                        | String  |    | Y    |     |
+| donor_tumour_staging_system_at_diagnosis     | String  |    | Y    |     |
+| donor_tumour_stage_at_diagnosis              | String  |    | Y    |     |
+| donor_tumour_stage_at_diagnosis_supplemental | String  |    | Y    |     |
+| donor_survival_time                          | Integer |    | Y    |     |
+| donor_interval_of_last_followup              | Integer |    | Y    |     |
+| icgc_specimen_id                             | String  |    | Y    |     |
+| submitted_specimen_id                        | String  |    | Y    |     |
+| specimen_type                                | String  |    | Y    | Y   |
+| specimen_type_other                          | String  |    | Y    |     |
+| specimen_interval                            | Integer |    | Y    |     |
+| specimen_donor_treatment_type                | String  |    | Y    |     |
+| specimen_donor_treatment_type_other          | String  |    | Y    |     |
+| specimen_processing                          | String  |    | Y    |     |
+| specimen_processing_other                    | String  |    | Y    |     |
+| specimen_storage                             | String  |    | Y    |     |
+| specimen_storage_other                       | String  |    | Y    |     |
+| tumour_confirmed                             | String  |    | Y    |     |
+| specimen_biobank                             | String  |    | Y    |     |
+| specimen_biobank_id                          | String  |    | Y    |     |
+| specimen_available                           | String  |    | Y    |     |
+| tumour_histological_type                     | String  |    | Y    |     |
+| tumour_grading_system                        | String  |    | Y    |     |
+| tumour_grade                                 | String  |    | Y    |     |
+| tumour_grade_supplemental                    | String  |    | Y    |     |
+| tumour_stage_system                          | String  |    | Y    |     |
+| tumour_stage                                 | String  |    | Y    |     |
+| tumour_stage_supplemental                    | String  |    | Y    |     |
+| digital_image_of_stained_section             | String  |    | Y    |     |
+
+# Table:expression
+|            column           |   type  | PK | null | idx |
+|=============================|=========|====|======|=====|
+| id                          | Integer | Y  |      |     |
+| icgc_donor_id               | String  |    | N    | Y   |
+| project_code                | String  |    | Y    |     |
+| icgc_specimen_id            | String  |    | Y    |     |
+| icgc_sample_id              | String  |    | N    | Y   |
+| submitted_sample_id         | String  |    | Y    |     |
+| analysis_id                 | String  |    | Y    |     |
+| gene_stable_id              | String  |    | Y    | Y   |
+| gene_chromosome             | String  |    | Y    |     |
+| gene_strand                 | Integer |    | Y    |     |
+| gene_start                  | Integer |    | Y    |     |
+| gene_end                    | Integer |    | Y    |     |
+| assembly_version            | String  |    | Y    |     |
+| normalized_read_count       | Float   |    | Y    |     |
+| raw_read_count              | Integer |    | Y    |     |
+| normalized_expression_level | Float   |    | Y    |     |
+| fold_change                 | Float   |    | Y    |     |
+| reference_sample_id         | String  |    | Y    |     |
+| quality_score               | Float   |    | Y    |     |
+| probability                 | String  |    | Y    |     |
+| is_annotated                | String  |    | Y    |     |
+| verification_status         | String  |    | Y    |     |
+| verification_platform       | String  |    | Y    |     |
+| probeset_id                 | String  |    | Y    |     |
+| gene_build_version          | String  |    | Y    |     |
+| platform                    | String  |    | Y    |     |
+| experimental_protocol       | String  |    | Y    |     |
+| base_calling_algorithm      | String  |    | Y    |     |
+| alignment_algorithm         | String  |    | Y    |     |
+| normalization_algorithm     | String  |    | Y    |     |
+| other_analysis_algorithm    | String  |    | Y    |     |
+| sequencing_strategy         | String  |    | Y    |     |
+| seq_coverage                | String  |    | Y    |     |
+| raw_data_repository         | String  |    | Y    |     |
+| raw_data_accession          | String  |    | Y    |     |

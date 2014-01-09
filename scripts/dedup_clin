@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+
+"""
+Dedup
+"""
+
+import argparse
+import glob
+import gzip
+import logging
+import os
+import sys
+import time
+
+import numpy as np
+import pandas as pd
+
+import sh
+
+logging.basicConfig(format=": %(message)s")
+lg = logging.getLogger(__name__)
+lg.setLevel(logging.DEBUG)
+
+def dedup_table(tumor):
+    start = time.time()
+    lg.debug("loading samples: {}".format(tumor))
+    basedir = os.path.join('data', 'current', tumor)
+    clinical_file = glob.glob(os.path.join(basedir, 'clinical.*.tsv.gz'))[0]
+
+    clin_name = clinical_file.rsplit('/')[-1]\
+            .replace('clinical.', '')\
+            .replace('.tsv.gz', '')
+    lg.debug("name: {}".format(clin_name))
+    clinical = pd.read_csv(clinical_file, compression="gzip", sep="\t")
+
+    lg.debug("loaded data ({:.4f} sec)".format(time.time() - start))
+    clinical = clinical.sort('icgc_donor_id')
+    clin_group = clinical.groupby('icgc_donor_id')
+
+    lg.debug("start aggr samples: {}".format(tumor))
+
+    def _unif(x):
+        return list(x)[0] if len(set(x)) == 1 else np.nan
+
+    clin = clin_group.agg(lambda x: x.apply(_unif))
+
+    #clin.set_index('icgc_donor_id', inplace=True)
+    lg.debug("finished aggr ({:.4f} sec)".format(time.time() - start))
+
+    to_remove = []
+    for cn in clin.columns:
+        c = clin[cn]
+        cnn = c[~(pd.isnull(c))]
+        if len(cnn) == 0:
+            to_remove.append(cn)
+    for x in to_remove:
+        del clin[x]
+
+    lg.debug("removed empty columns ({:.4f} sec)".format(time.time() - start))
+
+    return clin_name, clin
+
+#find files
+for project in os.listdir('data/current'):
+    if project[0] == '.':
+        continue
+    lg.debug("working on {}".format(project))
+
+    clin_name, clin = dedup_table(project)
+
+    outfile = os.path.join('data', 'current', project,
+                           'clinicalclean.{}.tsv'.format(clin_name))
+    lg.debug("output: %s", outfile)
+    clin.to_csv(outfile, sep="\t")
+    sh.gzip(outfile)
+    #print(clin.head())
+
+
+
+
